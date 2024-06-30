@@ -319,6 +319,10 @@ class PreprocessDataset:
             with open(dataset_file_path, 'w', encoding='utf-8') as f:
                 for entry in final_dataset:
                     f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+            
+            ## save dataset to a parquet file
+            parquet_file_path = "datasets/sinhala-instruction-finetune-large.parquet"
+            final_dataset.to_parquet(parquet_file_path)
         
         else:
             if self.dataset_name == SinhalaDatasets.SINHALA_ELI5:
