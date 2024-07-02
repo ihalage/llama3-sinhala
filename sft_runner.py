@@ -5,10 +5,9 @@
 
     @author     Achintha Ihalage
 
-    @brief      This module is responsible for acquiring various Sinhala
-                datasets from Hugging Face Datasets Hub and transforming
-                them into a common format to be consumed for supervised
-                finetuning of LLMs. 
+    @brief      This module is responsible for finetuning LLMs including LLaMA3
+                and Phi3 for sinhala language understanding and responding in
+                Sinhala. 
 
  ****************************************************************************
 """
@@ -254,9 +253,9 @@ if __name__=="__main__":
         dataset_id = "ihalage/sinhala-instruction-finetune-large",
         output_model_path = "finetuned_models/llama3_8b",
         learning_rate = 5e-5,
-        batch_size = 2,
-        gradient_accumulation_steps = 4,
-        n_epochs = 5,
+        batch_size = 1,
+        gradient_accumulation_steps = 8,
+        n_epochs = 3,
         max_seq_len = 2048,
         test_size = 0.15,
         use_lora = True,
