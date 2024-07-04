@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 import wandb
-wandb.init(project="LLaMA3_finetune_Sinhala", name="llama3_sinhala")
+wandb.init(project="LLaMA3_finetune_Phi3", name="phi3_sinhala")
 
 class SinhalaSFT:
     """
@@ -117,7 +117,7 @@ class SinhalaSFT:
         def create_message_column(row):
            
             messages = [
-                        {"role": "system", "content": row["question_prompt"]},
+                        {"role": "user", "content": row["question_prompt"]},
                         {"role": "assistant", "content": row["response_prompt"]},
                         ]
 
@@ -200,6 +200,7 @@ class SinhalaSFT:
         tokenizer = AutoTokenizer.from_pretrained(self.model_id_or_path, trust_remote_code=True, add_eos_token=True, use_fast=True)
         # padding token is set to the unknown token.
         tokenizer.pad_token = tokenizer.eos_token
+        # tokenizer.pad_token = tokenizer.
         # ID of the padding token is set to the ID of the unknown token.
         tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
         
@@ -250,14 +251,15 @@ class SinhalaSFT:
 if __name__=="__main__":
     ftobj = SinhalaSFT(
         model_id_or_path = "meta-llama/Meta-Llama-3-8B-Instruct",
+        # model_id_or_path = "microsoft/Phi-3-mini-4k-instruct",
         dataset_id = "ihalage/sinhala-instruction-finetune-large",
         output_model_path = "finetuned_models/llama3_8b",
         learning_rate = 5e-5,
         batch_size = 1,
         gradient_accumulation_steps = 8,
-        n_epochs = 3,
+        n_epochs = 5,
         max_seq_len = 2048,
-        test_size = 0.15,
+        test_size = 0.1,
         use_lora = True,
         lora_r = 32,
         lora_alpha = 64,
