@@ -11,7 +11,7 @@
 
  ****************************************************************************
 """
-
+import numpy as np
 import torch
 from datasets import load_dataset, load_metric
 from peft import LoraConfig, prepare_model_for_kbit_training
@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 import wandb
-wandb.init(project="LLaMA3_finetune_Phi3", name="phi3_sinhala")
+wandb.init(project="LLaMA3_finetune_Sinhala", name="llama3_sinhala")
 
 class SinhalaSFT:
     """
@@ -115,8 +115,16 @@ class SinhalaSFT:
             tokenizer.padding_side = 'left'
         
         def create_message_column(row):
-           
+            system_prompt = '''
+                ඔබේ නම LLaMA3-Sinhala. ඔබව Meta විසින් train කර ඇති අතර අචින්ත ඉහළගේ විසින් finetune කර ඇත.
+                You are a helpful multilingual chat assistant capable of conversing in multiple languages, including Sinhala. 
+                Your primary objectives are:
+                1. Understand and respond to user queries accurately and clearly. 
+                2. Answer in the language that the question was asked. Try to give a professional and comprehensive answer when possible.
+                '''
+            
             messages = [
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": row["question_prompt"]},
                         {"role": "assistant", "content": row["response_prompt"]},
                         ]
@@ -187,6 +195,59 @@ class SinhalaSFT:
             )
         return args
     
+    def compute_metrics(self, eval_pred):
+        """
+        Function to get the evaluation metrics for the generative task.
+        This calculates following metrics.
+            - token accuracy
+            - BLEU score
+            - ROUGE 1, 3 & L
+            - ROUGE score L sum
+
+        Args:
+            eval_pred: Predictions and labels for the evaluation set
+            tokenizer: Loaded tokenizer of the model
+
+        Returns:
+            A dictionary with calculated metrics
+        """
+        print("Runnig compute_metrics ........")
+        print(f"Evalpred: {eval_pred}")
+        tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True, add_eos_token=True, use_fast=True)
+
+        predictions, labels = eval_pred
+        decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+        # token-level accuracy
+        token_accuracy = np.mean([
+            np.mean([p == l for p, l in zip(pred.split(), label.split())])
+            for pred, label in zip(decoded_preds, decoded_labels)
+        ])
+
+        ## get metrics from transformers package
+        bleu_metric = load_metric("sacrebleu")
+        rouge_metric = load_metric("rouge")
+
+        # BLEU score
+        bleu = bleu_metric.compute(predictions=decoded_preds, references=[[label] for label in decoded_labels])
+
+        # ROUGE score
+        rouge = rouge_metric.compute(predictions=decoded_preds, references=decoded_labels)
+
+        metrics = {
+            "token_accuracy": token_accuracy,
+            "bleu": bleu['score'],
+            "rouge1": rouge['rouge1'].mid.fmeasure,
+            "rouge2": rouge['rouge2'].mid.fmeasure,
+            "rougeL": rouge['rougeL'].mid.fmeasure,
+            "rougeLsum": rouge['rougeLsum'].mid.fmeasure,
+        }
+        logger.info(f"Metrics: {metrics}")
+        print(f"Metrics: {metrics}")
+
+        return metrics
+    
     def finetune_model(self):
         """
         Function to finetune an LLM. This gets the model by model_id and performs data processing steps and initializes model training.
@@ -198,10 +259,8 @@ class SinhalaSFT:
         attn_implementation, compute_dtype = self.get_attn_implementation()
 
         tokenizer = AutoTokenizer.from_pretrained(self.model_id_or_path, trust_remote_code=True, add_eos_token=True, use_fast=True)
-        # padding token is set to the unknown token.
+        # padding token is set to the eos token.
         tokenizer.pad_token = tokenizer.eos_token
-        # tokenizer.pad_token = tokenizer.
-        # ID of the padding token is set to the ID of the unknown token.
         tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
         
         ## padding side is set to 'left' for phi3, meaning that padding tokens will be added to the left of the sequence.
@@ -240,7 +299,7 @@ class SinhalaSFT:
                     max_seq_length=self.max_seq_len,
                     tokenizer=tokenizer,
                     args=args,
-                    # data_collator=data_collator,
+                    packing=True,
                     # compute_metrics=self.compute_metrics,
             )
 
@@ -261,8 +320,8 @@ if __name__=="__main__":
         max_seq_len = 2048,
         test_size = 0.1,
         use_lora = True,
-        lora_r = 32,
-        lora_alpha = 64,
+        lora_r = 16,
+        lora_alpha = 32,
     )
 
     ftobj.finetune_model()
