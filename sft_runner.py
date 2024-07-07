@@ -128,7 +128,13 @@ class SinhalaSFT:
                         {"role": "user", "content": row["question_prompt"]},
                         {"role": "assistant", "content": row["response_prompt"]},
                         ]
-
+            
+            ## original version of phi3 wasn't trained with a system prompt (this was appended to the user prompt itself). Although authors claim to have added system prompt now.
+            if "phi3" in self.model_id_or_path.lower():
+                messages = [
+                        {"role": "user", "content": system_prompt + row["question_prompt"]},
+                        {"role": "assistant", "content": row["response_prompt"]},
+                        ]
             # return a dictionary with a 'messages' key and the 'messages' list as its value.
             return {"messages": messages}
 
@@ -285,6 +291,13 @@ class SinhalaSFT:
                 target_modules=self.lora_target_modules
             )
         else:
+            ## cannot quantize the model for full finetuning
+            model = AutoModelForCausalLM.from_pretrained(
+                  self.model_id_or_path, torch_dtype=compute_dtype, trust_remote_code=True,
+                  attn_implementation=attn_implementation,
+                #   quantization_config=self.quant_config,
+                  device_map={"": PartialState().process_index},
+                    )
             peft_config = None
 
         # device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
